@@ -105,5 +105,20 @@ def main():
         logging.error(f"❌ Server error: {e}")
         sys.exit(1)
 
+# Create app instance for Gunicorn
+app = None
+
+def create_app():
+    """Create Flask app instance"""
+    global app
+    if app is None:
+        from backend.app import app as flask_app
+        Config.init_app(flask_app)
+        app = flask_app
+    return app
+
+# For Gunicorn
+app = create_app()
+
 if __name__ == '__main__':
     main()

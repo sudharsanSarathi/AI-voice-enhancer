@@ -2,20 +2,20 @@ services:
   - type: web
     name: voice-enhancer-ai
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python run.py
-    plan: starter
+    buildCommand: |
+      pip install --upgrade pip
+      pip install --no-cache-dir -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT run:app
+    plan: free
     healthCheckPath: /api/health
     envVars:
       - key: PORT
         value: 10000
       - key: PYTHON_VERSION
-        value: 3.9.18
+        value: 3.9
       - key: DEBUG
         value: false
       - key: LOG_LEVEL
         value: INFO
-    disk:
-      name: voice-enhancer-storage
-      mountPath: /app/uploads
-      sizeGB: 5
+      - key: PYTHONPATH
+        value: /opt/render/project/src

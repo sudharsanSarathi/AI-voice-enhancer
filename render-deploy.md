@@ -47,13 +47,13 @@ Fill out the following fields exactly as shown:
 
 #### Build & Deploy Settings:
 - **Runtime**: `Python 3` (should be auto-detected)
-- **Build Command**: 
+- **Build Command**:
   ```
-  pip install -r requirements.txt
+  pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
   ```
-- **Start Command**: 
+- **Start Command**:
   ```
-  python run.py
+  gunicorn --bind 0.0.0.0:$PORT run:app
   ```
 
 #### Advanced Settings (Click "Advanced" to expand):
