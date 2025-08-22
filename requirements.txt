@@ -3,26 +3,16 @@ Flask==2.3.3
 Flask-CORS==4.0.0
 Werkzeug==2.3.7
 
-# Audio processing dependencies
-clearvoice
-audioop-lts
-
 # File handling and utilities
-requests
-python-dotenv
+requests==2.31.0
+python-dotenv==1.0.0
 
-# Data processing (lighter versions for Render)
-numpy
-scipy
-
-# Audio format support
-pydub
-soundfile
-
-# Machine learning (lighter installation)
-torch --index-url https://download.pytorch.org/whl/cpu
-torchaudio --index-url https://download.pytorch.org/whl/cpu
-transformers
+# Audio processing
+pydub==0.25.1
+clearvoice
 
 # Production server
-gunicorn
+gunicorn==21.2.0
+
+# Basic dependencies
+numpy>=1.21.0,<2.0.0
