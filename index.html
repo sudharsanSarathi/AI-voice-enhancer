@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Enhancer AI</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="demo-banner" style="background: #ff6b6b; color: white; padding: 10px; text-align: center; border-radius: 10px; margin-bottom: 20px; font-weight: bold;">
+            🎭 DEMO MODE - Interactive Preview Only | For full AI processing, deploy to Render.com
+        </div>
+        
+        <header>
+            <h1>🎵 Voice Enhancer AI</h1>
+            <p>Remove background noise from your audio files using advanced AI models</p>
+        </header>
+
+        <main>
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <h3>Drag & Drop Audio File</h3>
+                    <p>or <span class="browse-link">browse files</span></p>
+                    <p class="file-info">Supports MP3, WAV, FLAC, OGG, AAC, AIFF (max 50MB)</p>
+                    <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,.aac,.aiff" hidden>
+                </div>
+                
+                <div class="file-selected" id="fileSelected" style="display: none;">
+                    <div class="file-info-display">
+                        <span class="file-name" id="fileName"></span>
+                        <span class="file-size" id="fileSize"></span>
+                    </div>
+                    <button class="remove-file" id="removeFile">✕</button>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <div class="intensity-control">
+                    <label for="intensity">Enhancement Intensity</label>
+                    <div class="slider-container">
+                        <input type="range" id="intensity" min="1" max="10" value="5" disabled>
+                        <div class="slider-labels">
+                            <span>Light</span>
+                            <span>Medium</span>
+                            <span>Strong</span>
+                        </div>
+                        <div class="slider-value">
+                            <span id="intensityValue">5</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="process-btn" id="processBtn" disabled>
+                    <span class="btn-text">Generate Enhanced Audio</span>
+                    <span class="btn-loading" style="display: none;">Processing...</span>
+                </button>
+            </div>
+
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <h3>Audio Comparison</h3>
+                
+                <div class="audio-comparison">
+                    <div class="audio-player">
+                        <h4>Original Audio</h4>
+                        <audio controls id="originalAudio">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+                    
+                    <div class="audio-player">
+                        <h4>Enhanced Audio</h4>
+                        <audio controls id="enhancedAudio">
+                            Your browser does not support the audio element.
+                        </audio>
+                        <button class="download-btn" id="downloadBtn">
+                            📥 Download Enhanced Audio
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Powered by ClearerVoice AI Models</p>
+        </footer>
+    </div>
+
+    <script src="static/js/app.js"></script>
+</body>
+</html>

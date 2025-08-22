@@ -240,34 +240,21 @@ async function processAudio() {
     
     setProcessButtonLoading(true);
     
-    try {
-        // Create form data
-        const formData = new FormData();
-        formData.append('audio', selectedFile);
-        formData.append('intensity', intensity);
-        
-        // Send request to backend
-        const response = await fetch('/api/process', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || 'Processing failed');
-        }
-        
-        processedData = data;
-        displayResults(data);
-        showSuccess(`Audio enhanced successfully using ${intensityLevel} intensity!`);
-        
-    } catch (error) {
-        console.error('Processing error:', error);
-        showError(error.message || 'Failed to process audio. Please try again.');
-    } finally {
+    // Demo mode for GitHub Pages
+    setTimeout(() => {
         setProcessButtonLoading(false);
-    }
+        showSuccess(`🎵 Demo Mode: This is a preview of the Voice Enhancer AI interface!
+        
+For full functionality with AI processing, deploy to:
+• Render.com (recommended)
+• Heroku
+• Your own server
+
+Selected intensity: ${intensity} (${intensityLevel})
+File: ${selectedFile.name}
+
+The actual app processes audio using ClearerVoice AI models!`);
+    }, 2000);
 }
 
 function displayResults(data) {
