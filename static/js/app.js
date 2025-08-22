@@ -240,21 +240,36 @@ async function processAudio() {
     
     setProcessButtonLoading(true);
     
-    // Demo mode for GitHub Pages
-    setTimeout(() => {
-        setProcessButtonLoading(false);
-        showSuccess(`🎵 Demo Mode: This is a preview of the Voice Enhancer AI interface!
+    try {
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('audio', selectedFile);
+        formData.append('intensity', intensity);
         
-For full functionality with AI processing, deploy to:
-• Render.com (recommended)
-• Heroku
-• Your own server
-
-Selected intensity: ${intensity} (${intensityLevel})
-File: ${selectedFile.name}
-
-The actual app processes audio using ClearerVoice AI models!`);
-    }, 2000);
+        // Send request to API
+        const response = await fetch('/api/process', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        processedData = data;
+        
+        // Display results
+        displayResults(data);
+        showSuccess(`Audio processed successfully! Model: ${data.model_used}`);
+        
+    } catch (error) {
+        console.error('Processing error:', error);
+        showError(`Processing failed: ${error.message}`);
+    } finally {
+        setProcessButtonLoading(false);
+    }
 }
 
 function displayResults(data) {
