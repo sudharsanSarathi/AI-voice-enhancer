@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Application specific
+uploads/*
+!uploads/.gitkeep
+processed/*
+!processed/.gitkeep
+
+# Logs
+*.log
+
+# Environment variables
+.env
+
+# Model cache
+clearvoice/checkpoints/
+
+# Large model files (>100MB)
+checkpoints/*/last_best_checkpoint.pt
+checkpoints/*/last_best_checkpoint.disc.pt
+
+# Test files
+test_uploads/
+test_processed/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
