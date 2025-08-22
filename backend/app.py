@@ -12,7 +12,13 @@ from config import Config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, static_folder='../static', template_folder='../frontend')
+# Get the absolute path to the project root
+import os
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+static_folder = os.path.join(project_root, 'static')
+template_folder = os.path.join(project_root, 'frontend')
+
+app = Flask(__name__, static_folder=static_folder, template_folder=template_folder)
 app.config.from_object(Config)
 CORS(app)
 
@@ -80,7 +86,18 @@ def process_audio_with_clearvoice(input_path, output_path, model_name):
 @app.route('/')
 def index():
     """Serve the main application page"""
-    return send_from_directory('../frontend', 'index.html')
+    try:
+        return send_from_directory(template_folder, 'index.html')
+    except Exception as e:
+        logger.error(f"Error serving index.html: {e}")
+        # Fallback: try to render template directly
+        from flask import render_template
+        return render_template('index.html')
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serve static files"""
+    return send_from_directory(static_folder, filename)
 
 @app.route('/api/health')
 def health_check():
