@@ -53,7 +53,7 @@ Fill out the following fields exactly as shown:
   ```
 - **Start Command**:
   ```
-  gunicorn --bind 0.0.0.0:$PORT run:app
+  gunicorn --bind 0.0.0.0:$PORT app:app
   ```
 
 #### Advanced Settings (Click "Advanced" to expand):
