@@ -502,3 +502,33 @@ footer {
         font-size: 1rem;
     }
 }
+
+/* Progress estimate styling */
+.progress-estimate {
+    text-align: center;
+    color: #28a745;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-top: 5px;
+}
+
+/* Faster progress animation */
+.progress-fill {
+    transition: width 0.3s ease;
+}
+
+/* Success indicators */
+.progress-container h3 {
+    color: #28a745;
+}
+
+/* Speed indicators */
+.speed-indicator {
+    display: inline-block;
+    background: #28a745;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin-left: 10px;
+}

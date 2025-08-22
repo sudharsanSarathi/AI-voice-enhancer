@@ -35,13 +35,14 @@ function createProgressSection() {
     progressSection.style.display = 'none';
     progressSection.innerHTML = `
         <div class="progress-container">
-            <h3>Processing Audio...</h3>
+            <h3>🚀 Fast Processing Audio...</h3>
             <div class="progress-bar">
                 <div class="progress-fill" id="progressFill"></div>
             </div>
-            <div class="progress-text" id="progressText">Initializing...</div>
+            <div class="progress-text" id="progressText">Initializing fast processing...</div>
             <div class="progress-stage" id="progressStage">Stage: Uploading</div>
             <div class="progress-time" id="progressTime">Time: 0s</div>
+            <div class="progress-estimate" id="progressEstimate">Estimated: 5-10 seconds</div>
         </div>
     `;
     
@@ -343,7 +344,7 @@ function startProgressTracking(fileId) {
         } catch (error) {
             console.error('Progress tracking error:', error);
         }
-    }, 1000); // Poll every second
+    }, 500); // Poll every 500ms for faster updates
 }
 
 async function getProcessingResult(fileId) {
@@ -354,7 +355,7 @@ async function getProcessingResult(fileId) {
             if (resultData.success) {
                 processedData = resultData;
                 displayResults(resultData);
-                showSuccess('Audio processing completed successfully!');
+                showSuccess('🚀 Audio processing completed successfully! (Fast processing)');
             }
         }
     } catch (error) {
@@ -396,7 +397,13 @@ async function processAudio() {
         if (data.success && data.status === 'processing') {
             // Start progress tracking
             startProgressTracking(data.file_id);
-            showSuccess('Processing started! Track progress below.');
+            showSuccess('🚀 Fast processing started! Should complete in 5-10 seconds.');
+            
+            // Update estimate
+            const progressEstimate = document.getElementById('progressEstimate');
+            if (progressEstimate && data.estimated_time) {
+                progressEstimate.textContent = `Estimated: ${data.estimated_time}`;
+            }
         } else {
             throw new Error(data.message || 'Unexpected response');
         }

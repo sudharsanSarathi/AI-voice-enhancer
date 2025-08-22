@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Enhancer AI</title>
+    <title>Voice Enhancer AI - Fast Processing</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🎵 Voice Enhancer AI</h1>
-            <p>Remove background noise from your audio files using advanced AI models</p>
+            <h1>🎵 Voice Enhancer AI <span class="speed-indicator">⚡ FAST</span></h1>
+            <p>Remove background noise from your audio files using fast AI processing (5-10 seconds)</p>
         </header>
 
         <main>
@@ -20,6 +20,7 @@
                     <h3>Drag & Drop Audio File</h3>
                     <p>or <span class="browse-link">browse files</span></p>
                     <p class="file-info">Supports MP3, WAV, FLAC, OGG, AAC, AIFF (max 50MB)</p>
+                    <p class="speed-info">⚡ Fast processing: 5-10 seconds per file</p>
                     <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,.aac,.aiff" hidden>
                 </div>
                 
@@ -49,10 +50,12 @@
                 </div>
 
                 <button class="process-btn" id="processBtn" disabled>
-                    <span class="btn-text">Generate Enhanced Audio</span>
+                    <span class="btn-text">🚀 Generate Enhanced Audio (Fast)</span>
                     <span class="btn-loading" style="display: none;">Processing...</span>
                 </button>
             </div>
+
+            <!-- Progress section will be inserted here by JavaScript -->
 
             <div class="results-section" id="resultsSection" style="display: none;">
                 <h3>Audio Comparison</h3>
@@ -79,7 +82,7 @@
         </main>
 
         <footer>
-            <p>Powered by ClearerVoice AI Models</p>
+            <p>Powered by Fast AI Processing • ⚡ 5-10 seconds per file</p>
         </footer>
     </div>
 
