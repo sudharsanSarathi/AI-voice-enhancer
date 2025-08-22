@@ -3,6 +3,8 @@ from flask_cors import CORS
 import os
 import tempfile
 import uuid
+import time
+import threading
 from pathlib import Path
 import logging
 from werkzeug.utils import secure_filename
@@ -25,6 +27,9 @@ CORS(app)
 # Ensure directories exist
 Config.UPLOAD_FOLDER.mkdir(exist_ok=True)
 Config.PROCESSED_FOLDER.mkdir(exist_ok=True)
+
+# Global progress tracking
+processing_status = {}
 
 def get_intensity_level(intensity_value):
     """Convert slider value (1-10) to intensity level"""
@@ -58,29 +63,63 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS
 
-def process_audio_with_clearvoice(input_path, output_path, model_name):
-    """Process audio using ClearerVoice model"""
+def update_progress(file_id, stage, progress, message):
+    """Update processing progress"""
+    if file_id not in processing_status:
+        processing_status[file_id] = {}
+    
+    processing_status[file_id].update({
+        'stage': stage,
+        'progress': progress,
+        'message': message,
+        'timestamp': time.time()
+    })
+    logger.info(f"Progress for {file_id}: {stage} - {progress}% - {message}")
+
+def process_audio_with_clearvoice(input_path, output_path, model_name, file_id):
+    """Process audio using ClearerVoice model with progress tracking"""
     try:
         # Import ClearerVoice here to handle potential import issues
+        update_progress(file_id, 'initializing', 10, 'Importing ClearerVoice library...')
         from clearvoice import ClearVoice
         
+        update_progress(file_id, 'model_loading', 20, f'Loading AI model: {model_name}...')
         logger.info(f"Processing audio with model: {model_name}")
         
         # Initialize ClearVoice with the specified model
         cv = ClearVoice(task='speech_enhancement', model_names=[model_name])
         
+        update_progress(file_id, 'processing', 50, 'Processing audio with AI model...')
+        
         # Process the audio file
         cv(input_path, output_path)
         
-        logger.info(f"Audio processing completed successfully")
-        return True
+        update_progress(file_id, 'finalizing', 90, 'Finalizing enhanced audio...')
+        
+        # Verify output file
+        if os.path.exists(output_path):
+            file_size = os.path.getsize(output_path)
+            update_progress(file_id, 'complete', 100, f'Processing complete! Output: {file_size} bytes')
+            logger.info(f"Audio processing completed successfully. Output size: {file_size} bytes")
+            return True
+        else:
+            update_progress(file_id, 'error', 0, 'Output file not generated')
+            logger.error("Output file not generated")
+            return False
         
     except ImportError as e:
-        logger.error(f"ClearerVoice import error: {e}")
+        error_msg = f"ClearerVoice import error: {e}"
+        update_progress(file_id, 'error', 0, error_msg)
+        logger.error(error_msg)
         logger.error("Please install clearvoice: pip install clearvoice")
         return False
     except Exception as e:
-        logger.error(f"Audio processing error: {e}")
+        error_msg = f"Audio processing error: {e}"
+        update_progress(file_id, 'error', 0, error_msg)
+        logger.error(error_msg)
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         return False
 
 @app.route('/')
@@ -102,7 +141,31 @@ def serve_static(filename):
 @app.route('/api/health')
 def health_check():
     """Health check endpoint"""
-    return jsonify({"status": "healthy", "message": "Voice Enhancer AI is running"})
+    try:
+        # Check if ClearerVoice is available
+        try:
+            from clearvoice import ClearVoice
+            clearvoice_available = True
+        except ImportError:
+            clearvoice_available = False
+        
+        return jsonify({
+            "status": "healthy", 
+            "message": "Voice Enhancer AI is running",
+            "clearvoice_available": clearvoice_available,
+            "models_loaded": list(Config.MODEL_CONFIGS.keys())
+        })
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/progress/<file_id>')
+def get_progress(file_id):
+    """Get processing progress for a specific file"""
+    if file_id in processing_status:
+        return jsonify(processing_status[file_id])
+    else:
+        return jsonify({"error": "File ID not found"}), 404
 
 @app.route('/api/process', methods=['POST'])
 def process_audio():
@@ -130,9 +193,14 @@ def process_audio():
         input_path = Config.UPLOAD_FOLDER / input_filename
         output_path = Config.PROCESSED_FOLDER / output_filename
         
+        # Initialize progress tracking
+        update_progress(file_id, 'uploading', 5, 'Saving uploaded file...')
+        
         # Save uploaded file
         file.save(input_path)
         logger.info(f"File saved: {input_path}")
+        
+        update_progress(file_id, 'preparing', 15, 'Preparing AI model...')
         
         # Get model configuration
         intensity_level = get_intensity_level(intensity)
@@ -141,33 +209,75 @@ def process_audio():
         logger.info(f"Processing with intensity: {intensity} ({intensity_level})")
         logger.info(f"Using model: {model_config['model_name']}")
         
-        # Process audio
-        success = process_audio_with_clearvoice(
-            str(input_path), 
-            str(output_path), 
-            model_config['model_name']
-        )
+        # Process audio in background thread
+        def process_in_background():
+            try:
+                success = process_audio_with_clearvoice(
+                    str(input_path), 
+                    str(output_path), 
+                    model_config['model_name'],
+                    file_id
+                )
+                
+                if success:
+                    # Clean up progress data after successful processing
+                    if file_id in processing_status:
+                        del processing_status[file_id]
+                else:
+                    # Keep error status for a while
+                    update_progress(file_id, 'error', 0, 'Processing failed. Please try again.')
+                    
+            except Exception as e:
+                logger.error(f"Background processing error: {e}")
+                update_progress(file_id, 'error', 0, f'Unexpected error: {str(e)}')
         
-        if not success:
-            return jsonify({"error": "Audio processing failed"}), 500
+        # Start background processing
+        thread = threading.Thread(target=process_in_background)
+        thread.daemon = True
+        thread.start()
         
-        # Verify output file exists
-        if not output_path.exists():
-            return jsonify({"error": "Enhanced audio file not generated"}), 500
-        
+        # Return immediately with file ID for progress tracking
         return jsonify({
             "success": True,
             "file_id": file_id,
-            "original_file": input_filename,
-            "enhanced_file": output_filename,
-            "intensity_level": intensity_level,
-            "model_used": model_config['model_name'],
-            "model_description": model_config['description']
+            "message": "Processing started. Use /api/progress/{file_id} to track progress.",
+            "status": "processing"
         })
         
     except Exception as e:
         logger.error(f"Processing error: {e}")
         return jsonify({"error": f"Processing failed: {str(e)}"}), 500
+
+@app.route('/api/result/<file_id>')
+def get_result(file_id):
+    """Get processing result for a completed file"""
+    try:
+        # Check if processing is complete
+        if file_id in processing_status:
+            status = processing_status[file_id]
+            if status.get('stage') == 'complete':
+                # Find the processed file
+                processed_files = list(Config.PROCESSED_FOLDER.glob(f"{file_id}_enhanced.wav"))
+                if processed_files:
+                    output_filename = processed_files[0].name
+                    # Find the original file
+                    original_files = list(Config.UPLOAD_FOLDER.glob(f"{file_id}_original.*"))
+                    if original_files:
+                        original_filename = original_files[0].name
+                        
+                        return jsonify({
+                            "success": True,
+                            "file_id": file_id,
+                            "original_file": original_filename,
+                            "enhanced_file": output_filename,
+                            "status": "complete"
+                        })
+        
+        return jsonify({"error": "Processing not complete or file not found"}), 404
+        
+    except Exception as e:
+        logger.error(f"Result retrieval error: {e}")
+        return jsonify({"error": f"Failed to retrieve result: {str(e)}"}), 500
 
 @app.route('/api/audio/uploads/<filename>')
 def get_uploaded_audio(filename):
