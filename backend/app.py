@@ -30,6 +30,7 @@ Config.PROCESSED_FOLDER.mkdir(exist_ok=True)
 
 # Global progress tracking
 processing_status = {}
+completed_files = {}  # Store completed files for a short time
 
 def get_intensity_level(intensity_value):
     """Convert slider value (1-10) to intensity level"""
@@ -87,6 +88,19 @@ def update_progress(file_id, stage, progress, message):
         'timestamp': time.time()
     })
     logger.info(f"Progress for {file_id}: {stage} - {progress}% - {message}")
+
+def cleanup_old_progress_data():
+    """Clean up old progress data to prevent memory leaks"""
+    current_time = time.time()
+    # Remove progress data older than 5 minutes
+    for file_id in list(processing_status.keys()):
+        if current_time - processing_status[file_id].get('timestamp', 0) > 300:
+            del processing_status[file_id]
+    
+    # Remove completed files older than 2 minutes
+    for file_id in list(completed_files.keys()):
+        if current_time - completed_files[file_id].get('timestamp', 0) > 120:
+            del completed_files[file_id]
 
 def apply_audio_enhancement(audio, config, file_id):
     """Apply advanced audio enhancement techniques"""
@@ -222,8 +236,19 @@ def health_check():
 @app.route('/api/progress/<file_id>')
 def get_progress(file_id):
     """Get processing progress for a specific file"""
+    # Clean up old data first
+    cleanup_old_progress_data()
+    
     if file_id in processing_status:
         return jsonify(processing_status[file_id])
+    elif file_id in completed_files:
+        # Return completion status
+        return jsonify({
+            "stage": "complete",
+            "progress": 100,
+            "message": "Processing completed successfully!",
+            "timestamp": completed_files[file_id]['timestamp']
+        })
     else:
         return jsonify({"error": "File ID not found"}), 404
 
@@ -280,9 +305,16 @@ def process_audio():
                 )
                 
                 if success:
-                    # Clean up progress data after successful processing
-                    if file_id in processing_status:
-                        del processing_status[file_id]
+                    # Mark as completed and add to completed files
+                    update_progress(file_id, 'complete', 100, 'Processing completed successfully!')
+                    completed_files[file_id] = {
+                        'timestamp': time.time(),
+                        'file_id': file_id,
+                        'original_file': input_filename,
+                        'enhanced_file': output_filename,
+                        'status': 'complete'
+                    }
+                    logger.info(f"Processing completed for file_id: {file_id}")
                 else:
                     # Keep error status for a while
                     update_progress(file_id, 'error', 0, 'Processing failed. Please try again.')
@@ -315,26 +347,25 @@ def get_result(file_id):
     """Get processing result for a completed file"""
     try:
         # Check if processing is complete
-        if file_id in processing_status:
-            status = processing_status[file_id]
-            if status.get('stage') == 'complete':
-                # Find the processed file
-                processed_files = list(Config.PROCESSED_FOLDER.glob(f"{file_id}_enhanced.wav"))
-                if processed_files:
-                    output_filename = processed_files[0].name
-                    # Find the original file
-                    original_files = list(Config.UPLOAD_FOLDER.glob(f"{file_id}_original.*"))
-                    if original_files:
-                        original_filename = original_files[0].name
-                        
-                        return jsonify({
-                            "success": True,
-                            "file_id": file_id,
-                            "original_file": original_filename,
-                            "enhanced_file": output_filename,
-                            "status": "complete",
-                            "processing_method": "Super-fast pydub enhancement"
-                        })
+        if file_id in completed_files:
+            result = completed_files[file_id]
+            # Find the processed file
+            processed_files = list(Config.PROCESSED_FOLDER.glob(f"{file_id}_enhanced.wav"))
+            if processed_files:
+                output_filename = processed_files[0].name
+                # Find the original file
+                original_files = list(Config.UPLOAD_FOLDER.glob(f"{file_id}_original.*"))
+                if original_files:
+                    original_filename = original_files[0].name
+                    
+                    return jsonify({
+                        "success": True,
+                        "file_id": file_id,
+                        "original_file": original_filename,
+                        "enhanced_file": output_filename,
+                        "status": "complete",
+                        "processing_method": "Super-fast pydub enhancement"
+                    })
         
         return jsonify({"error": "Processing not complete or file not found"}), 404
         

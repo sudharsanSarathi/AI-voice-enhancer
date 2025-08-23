@@ -288,6 +288,8 @@ function updateProgressBar(progress, stage, message) {
 function startProgressTracking(fileId) {
     currentFileId = fileId;
     const startTime = Date.now();
+    let errorCount = 0;
+    const maxErrors = 10; // Stop after 10 consecutive errors
     
     // Show progress section
     showProgressSection();
@@ -298,6 +300,7 @@ function startProgressTracking(fileId) {
             const response = await fetch(`/api/progress/${fileId}`);
             if (response.ok) {
                 const progressData = await response.json();
+                errorCount = 0; // Reset error count on success
                 
                 // Update progress bar
                 updateProgressBar(
@@ -340,11 +343,41 @@ function startProgressTracking(fileId) {
                         progressSection.style.display = 'none';
                     }
                 }
+            } else if (response.status === 404) {
+                errorCount++;
+                console.warn(`Progress not found for file ${fileId}, error count: ${errorCount}`);
+                
+                // Stop polling after too many 404 errors
+                if (errorCount >= maxErrors) {
+                    clearInterval(progressInterval);
+                    progressInterval = null;
+                    showError('Processing status not found. Please try uploading again.');
+                    
+                    // Hide progress section
+                    const progressSection = document.getElementById('progressSection');
+                    if (progressSection) {
+                        progressSection.style.display = 'none';
+                    }
+                }
             }
         } catch (error) {
+            errorCount++;
             console.error('Progress tracking error:', error);
+            
+            // Stop polling after too many errors
+            if (errorCount >= maxErrors) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+                showError('Failed to track progress. Please try uploading again.');
+                
+                // Hide progress section
+                const progressSection = document.getElementById('progressSection');
+                if (progressSection) {
+                    progressSection.style.display = 'none';
+                }
+            }
         }
-    }, 500); // Poll every 500ms for faster updates
+    }, 1000); // Poll every 1 second to reduce server load
 }
 
 async function getProcessingResult(fileId) {
