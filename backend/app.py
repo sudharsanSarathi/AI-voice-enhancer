@@ -481,7 +481,7 @@ def get_uploaded_audio(filename):
             logger.error(f"Uploaded file not found: {filename}")
             return jsonify({"error": "File not found"}), 404
             
-        return send_from_directory(Config.UPLOAD_FOLDER, filename)
+        return send_from_directory(str(Config.UPLOAD_FOLDER.absolute()), filename)
     except Exception as e:
         logger.error(f"Error serving uploaded file {filename}: {e}")
         return jsonify({"error": "File not found"}), 404
@@ -499,7 +499,7 @@ def get_processed_audio(filename):
             logger.error(f"Processed file not found: {filename}")
             return jsonify({"error": "File not found"}), 404
             
-        return send_from_directory(Config.PROCESSED_FOLDER, filename)
+        return send_from_directory(str(Config.PROCESSED_FOLDER.absolute()), filename)
     except Exception as e:
         logger.error(f"Error serving processed file {filename}: {e}")
         return jsonify({"error": "File not found"}), 404
@@ -509,7 +509,7 @@ def download_audio(filename):
     """Download processed audio file"""
     try:
         return send_from_directory(
-            Config.PROCESSED_FOLDER, 
+            str(Config.PROCESSED_FOLDER.absolute()), 
             filename, 
             as_attachment=True,
             download_name=f"enhanced_{filename}"
@@ -527,6 +527,78 @@ def internal_error(e):
     """Handle internal server errors"""
     logger.error(f"Internal server error: {e}")
     return jsonify({"error": "Internal server error"}), 500
+
+@app.route('/api/test-upload', methods=['POST'])
+def test_upload():
+    """Test endpoint to verify file upload functionality"""
+    try:
+        if 'audio' not in request.files:
+            return jsonify({"error": "No audio file provided"}), 400
+        
+        file = request.files['audio']
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        # Generate test filename
+        file_id = str(uuid.uuid4())
+        original_extension = file.filename.rsplit('.', 1)[1].lower()
+        test_filename = f"test_{file_id}_original.{original_extension}"
+        test_path = Config.UPLOAD_FOLDER / test_filename
+        
+        logger.info(f"TEST: About to save test file: {test_path}")
+        logger.info(f"TEST: Upload folder exists: {Config.UPLOAD_FOLDER.exists()}")
+        logger.info(f"TEST: Upload folder path: {Config.UPLOAD_FOLDER.absolute()}")
+        logger.info(f"TEST: File object: {file}")
+        logger.info(f"TEST: File filename: {file.filename}")
+        logger.info(f"TEST: File content type: {file.content_type}")
+        
+        # Save file
+        file.save(test_path)
+        
+        # Verify file was saved
+        file_exists = os.path.exists(test_path)
+        file_size = os.path.getsize(test_path) if file_exists else 0
+        
+        logger.info(f"TEST: File saved successfully: {test_path}")
+        logger.info(f"TEST: File exists: {file_exists}")
+        logger.info(f"TEST: File size: {file_size} bytes")
+        
+        return jsonify({
+            "success": True,
+            "test_filename": test_filename,
+            "file_exists": file_exists,
+            "file_size": file_size,
+            "upload_folder": str(Config.UPLOAD_FOLDER.absolute()),
+            "message": "Test upload completed"
+        })
+        
+    except Exception as e:
+        logger.error(f"TEST: Upload error: {e}")
+        return jsonify({"error": f"Test upload failed: {str(e)}"}), 500
+
+@app.route('/api/test-serve/<filename>')
+def test_serve(filename):
+    """Test endpoint to verify file serving functionality"""
+    try:
+        logger.info(f"TEST: Requesting test file: {filename}")
+        logger.info(f"TEST: Upload folder: {Config.UPLOAD_FOLDER}")
+        logger.info(f"TEST: Upload folder absolute: {Config.UPLOAD_FOLDER.absolute()}")
+        logger.info(f"TEST: Full path: {Config.UPLOAD_FOLDER / filename}")
+        logger.info(f"TEST: Full path absolute: {(Config.UPLOAD_FOLDER / filename).absolute()}")
+        logger.info(f"TEST: File exists: {(Config.UPLOAD_FOLDER / filename).exists()}")
+        
+        # List all files in upload folder
+        all_files = list(Config.UPLOAD_FOLDER.glob("*"))
+        logger.info(f"TEST: All files in upload folder: {[f.name for f in all_files]}")
+        
+        if not (Config.UPLOAD_FOLDER / filename).exists():
+            logger.error(f"TEST: File not found: {filename}")
+            return jsonify({"error": "File not found"}), 404
+            
+        return send_from_directory(str(Config.UPLOAD_FOLDER.absolute()), filename)
+    except Exception as e:
+        logger.error(f"TEST: Error serving file {filename}: {e}")
+        return jsonify({"error": "File not found"}), 404
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', Config.PORT))
