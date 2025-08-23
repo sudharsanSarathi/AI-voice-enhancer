@@ -153,12 +153,24 @@ def process_audio_super_fast(input_path, output_path, intensity_level, file_id):
         update_progress(file_id, 'initializing', 10, 'Initializing super-fast processing...')
         
         # Import pydub
-        from pydub import AudioSegment
+        try:
+            from pydub import AudioSegment
+            logger.info("Successfully imported pydub")
+        except ImportError as e:
+            logger.error(f"Failed to import pydub: {e}")
+            update_progress(file_id, 'error', 0, 'Audio processing library not available')
+            return False
         
         update_progress(file_id, 'loading', 20, 'Loading audio file...')
         
         # Load audio file
+        logger.info(f"Loading audio file from: {input_path}")
+        logger.info(f"Input file exists: {os.path.exists(input_path)}")
+        if os.path.exists(input_path):
+            logger.info(f"Input file size: {os.path.getsize(input_path)} bytes")
+        
         audio = AudioSegment.from_file(input_path)
+        logger.info(f"Audio loaded successfully, duration: {len(audio)}ms")
         
         update_progress(file_id, 'processing', 25, 'Getting processing configuration...')
         
@@ -171,6 +183,7 @@ def process_audio_super_fast(input_path, output_path, intensity_level, file_id):
         update_progress(file_id, 'saving', 90, 'Saving enhanced audio...')
         
         # Export as high-quality WAV
+        logger.info(f"Exporting enhanced audio to: {output_path}")
         enhanced_audio.export(
             output_path, 
             format="wav",
@@ -178,12 +191,17 @@ def process_audio_super_fast(input_path, output_path, intensity_level, file_id):
         )
         
         # Verify output
+        logger.info(f"Checking if output file exists: {output_path}")
+        logger.info(f"File exists: {os.path.exists(output_path)}")
+        
         if os.path.exists(output_path):
             file_size = os.path.getsize(output_path)
+            logger.info(f"Output file size: {file_size} bytes")
             update_progress(file_id, 'complete', 100, f'Super-fast processing complete! Output: {file_size} bytes')
             logger.info(f"Super-fast processing completed! Output size: {file_size} bytes")
             return True
         else:
+            logger.error(f"Output file was not created: {output_path}")
             update_progress(file_id, 'error', 0, 'Output file not generated')
             return False
             
@@ -219,13 +237,21 @@ def health_check():
         try:
             from pydub import AudioSegment
             pydub_available = True
-        except ImportError:
+            logger.info("Pydub is available in health check")
+        except ImportError as e:
             pydub_available = False
+            logger.error(f"Pydub import error in health check: {e}")
+        
+        # Check if directories exist
+        upload_exists = Config.UPLOAD_FOLDER.exists()
+        processed_exists = Config.PROCESSED_FOLDER.exists()
         
         return jsonify({
             "status": "healthy", 
             "message": "Voice Enhancer AI is running",
             "pydub_available": pydub_available,
+            "upload_folder_exists": upload_exists,
+            "processed_folder_exists": processed_exists,
             "processing_method": "Super-fast pydub processing (2-5 seconds)",
             "version": "2.0 - Lightning Fast"
         })
@@ -377,16 +403,36 @@ def get_result(file_id):
 def get_uploaded_audio(filename):
     """Serve uploaded audio files"""
     try:
+        logger.info(f"Requesting uploaded file: {filename}")
+        logger.info(f"Upload folder: {Config.UPLOAD_FOLDER}")
+        logger.info(f"Full path: {Config.UPLOAD_FOLDER / filename}")
+        logger.info(f"File exists: {(Config.UPLOAD_FOLDER / filename).exists()}")
+        
+        if not (Config.UPLOAD_FOLDER / filename).exists():
+            logger.error(f"Uploaded file not found: {filename}")
+            return jsonify({"error": "File not found"}), 404
+            
         return send_from_directory(Config.UPLOAD_FOLDER, filename)
-    except FileNotFoundError:
+    except Exception as e:
+        logger.error(f"Error serving uploaded file {filename}: {e}")
         return jsonify({"error": "File not found"}), 404
 
 @app.route('/api/audio/processed/<filename>')
 def get_processed_audio(filename):
     """Serve processed audio files"""
     try:
+        logger.info(f"Requesting processed file: {filename}")
+        logger.info(f"Processed folder: {Config.PROCESSED_FOLDER}")
+        logger.info(f"Full path: {Config.PROCESSED_FOLDER / filename}")
+        logger.info(f"File exists: {(Config.PROCESSED_FOLDER / filename).exists()}")
+        
+        if not (Config.PROCESSED_FOLDER / filename).exists():
+            logger.error(f"Processed file not found: {filename}")
+            return jsonify({"error": "File not found"}), 404
+            
         return send_from_directory(Config.PROCESSED_FOLDER, filename)
-    except FileNotFoundError:
+    except Exception as e:
+        logger.error(f"Error serving processed file {filename}: {e}")
         return jsonify({"error": "File not found"}), 404
 
 @app.route('/api/download/<filename>')
