@@ -351,8 +351,23 @@ def process_audio():
         update_progress(file_id, 'uploading', 5, 'Saving uploaded file...')
         
         # Save uploaded file
-        file.save(input_path)
-        logger.info(f"File saved: {input_path}")
+        logger.info(f"About to save file: {input_path}")
+        logger.info(f"Upload folder exists: {Config.UPLOAD_FOLDER.exists()}")
+        logger.info(f"Upload folder path: {Config.UPLOAD_FOLDER.absolute()}")
+        logger.info(f"File object: {file}")
+        logger.info(f"File filename: {file.filename}")
+        logger.info(f"File content type: {file.content_type}")
+        
+        try:
+            file.save(input_path)
+            logger.info(f"File saved successfully: {input_path}")
+            logger.info(f"Saved file exists: {os.path.exists(input_path)}")
+            if os.path.exists(input_path):
+                logger.info(f"Saved file size: {os.path.getsize(input_path)} bytes")
+        except Exception as e:
+            logger.error(f"Failed to save file: {e}")
+            update_progress(file_id, 'error', 0, f'Failed to save uploaded file: {str(e)}')
+            return jsonify({"error": f"Failed to save file: {str(e)}"}), 500
         
         update_progress(file_id, 'preparing', 15, 'Preparing super-fast processing...')
         
@@ -366,6 +381,11 @@ def process_audio():
         # Process audio in background thread
         def process_in_background():
             try:
+                logger.info(f"Background processing started for file_id: {file_id}")
+                logger.info(f"Input path: {input_path}")
+                logger.info(f"Output path: {output_path}")
+                logger.info(f"Input file exists: {os.path.exists(input_path)}")
+                
                 success = process_audio_super_fast(
                     str(input_path), 
                     str(output_path), 
@@ -375,6 +395,11 @@ def process_audio():
                 
                 if success:
                     # Mark as completed and add to completed files
+                    logger.info(f"Processing succeeded for file_id: {file_id}")
+                    logger.info(f"Output file exists: {os.path.exists(output_path)}")
+                    if os.path.exists(output_path):
+                        logger.info(f"Output file size: {os.path.getsize(output_path)} bytes")
+                    
                     update_progress(file_id, 'complete', 100, 'Processing completed successfully!')
                     completed_files[file_id] = {
                         'timestamp': time.time(),
@@ -385,6 +410,7 @@ def process_audio():
                     }
                     logger.info(f"Processing completed for file_id: {file_id}")
                 else:
+                    logger.error(f"Processing failed for file_id: {file_id}")
                     # Keep error status for a while
                     update_progress(file_id, 'error', 0, 'Processing failed. Please try again.')
                     
