@@ -7,9 +7,8 @@ Werkzeug==2.3.7
 requests==2.31.0
 python-dotenv==1.0.0
 
-# Audio processing
+# Super-fast audio processing
 pydub==0.25.1
-clearvoice
 
 # Production server
 gunicorn==21.2.0

@@ -16,38 +16,12 @@ const downloadBtn = document.getElementById('downloadBtn');
 // Global variables
 let selectedFile = null;
 let processedData = null;
-let currentFileId = null;
-let progressInterval = null;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
     setupEventListeners();
     updateIntensityDisplay();
-    createProgressSection();
 });
-
-function createProgressSection() {
-    // Create progress section after the controls
-    const controlsSection = document.querySelector('.controls-section');
-    const progressSection = document.createElement('div');
-    progressSection.className = 'progress-section';
-    progressSection.id = 'progressSection';
-    progressSection.style.display = 'none';
-    progressSection.innerHTML = `
-        <div class="progress-container">
-            <h3>⚡ Super-Fast Processing Audio...</h3>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-            <div class="progress-text" id="progressText">Initializing fast processing...</div>
-            <div class="progress-stage" id="progressStage">Stage: Uploading</div>
-            <div class="progress-time" id="progressTime">Time: 0s</div>
-            <div class="progress-estimate" id="progressEstimate">Estimated: 2-5 seconds</div>
-        </div>
-    `;
-    
-    controlsSection.parentNode.insertBefore(progressSection, controlsSection.nextSibling);
-}
 
 function setupEventListeners() {
     // File upload events
@@ -131,19 +105,6 @@ function displaySelectedFile(file) {
 function clearFile() {
     selectedFile = null;
     processedData = null;
-    currentFileId = null;
-    
-    // Stop progress tracking
-    if (progressInterval) {
-        clearInterval(progressInterval);
-        progressInterval = null;
-    }
-    
-    // Hide progress section
-    const progressSection = document.getElementById('progressSection');
-    if (progressSection) {
-        progressSection.style.display = 'none';
-    }
     
     uploadArea.style.display = 'block';
     fileSelected.style.display = 'none';
@@ -268,102 +229,6 @@ function resetProcessButton() {
     setProcessButtonLoading(false);
 }
 
-function showProgressSection() {
-    const progressSection = document.getElementById('progressSection');
-    if (progressSection) {
-        progressSection.style.display = 'block';
-    }
-}
-
-function updateProgressBar(progress, stage, message) {
-    const progressFill = document.getElementById('progressFill');
-    const progressText = document.getElementById('progressText');
-    const progressStage = document.getElementById('progressStage');
-    
-    if (progressFill) progressFill.style.width = `${progress}%`;
-    if (progressText) progressText.textContent = message;
-    if (progressStage) progressStage.textContent = `Stage: ${stage}`;
-}
-
-function startProgressTracking(fileId) {
-    currentFileId = fileId;
-    const startTime = Date.now();
-    
-    // Show progress section
-    showProgressSection();
-    
-    // Start progress polling
-    progressInterval = setInterval(async () => {
-        try {
-            const response = await fetch(`/api/progress/${fileId}`);
-            if (response.ok) {
-                const progressData = await response.json();
-                
-                // Update progress bar
-                updateProgressBar(
-                    progressData.progress || 0,
-                    progressData.stage || 'unknown',
-                    progressData.message || 'Processing...'
-                );
-                
-                // Update time
-                const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                const progressTime = document.getElementById('progressTime');
-                if (progressTime) {
-                    progressTime.textContent = `Time: ${elapsed}s`;
-                }
-                
-                // Check if processing is complete
-                if (progressData.stage === 'complete') {
-                    clearInterval(progressInterval);
-                    progressInterval = null;
-                    
-                    // Get the result
-                    await getProcessingResult(fileId);
-                    
-                    // Hide progress section
-                    const progressSection = document.getElementById('progressSection');
-                    if (progressSection) {
-                        progressSection.style.display = 'none';
-                    }
-                }
-                
-                // Check if there's an error
-                if (progressData.stage === 'error') {
-                    clearInterval(progressInterval);
-                    progressInterval = null;
-                    showError(progressData.message || 'Processing failed');
-                    
-                    // Hide progress section
-                    const progressSection = document.getElementById('progressSection');
-                    if (progressSection) {
-                        progressSection.style.display = 'none';
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Progress tracking error:', error);
-        }
-    }, 500); // Poll every 500ms for faster updates
-}
-
-async function getProcessingResult(fileId) {
-    try {
-        const response = await fetch(`/api/result/${fileId}`);
-        if (response.ok) {
-            const resultData = await response.json();
-            if (resultData.success) {
-                processedData = resultData;
-                displayResults(resultData);
-                showSuccess('⚡ Audio processing completed successfully! (Super-fast processing)');
-            }
-        }
-    } catch (error) {
-        console.error('Error getting result:', error);
-        showError('Failed to retrieve processing result');
-    }
-}
-
 async function processAudio() {
     if (!selectedFile) {
         showError('Please select an audio file first');
@@ -393,20 +258,11 @@ async function processAudio() {
         }
         
         const data = await response.json();
+        processedData = data;
         
-        if (data.success && data.status === 'processing') {
-            // Start progress tracking
-            startProgressTracking(data.file_id);
-            showSuccess('⚡ Super-fast processing started! Should complete in 2-5 seconds.');
-            
-            // Update estimate
-            const progressEstimate = document.getElementById('progressEstimate');
-            if (progressEstimate && data.estimated_time) {
-                progressEstimate.textContent = `Estimated: ${data.estimated_time}`;
-            }
-        } else {
-            throw new Error(data.message || 'Unexpected response');
-        }
+        // Display results
+        displayResults(data);
+        showSuccess(`Audio processed successfully! Model: ${data.model_used}`);
         
     } catch (error) {
         console.error('Processing error:', error);
