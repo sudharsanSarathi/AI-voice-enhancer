@@ -148,23 +148,23 @@ def apply_audio_enhancement(audio, config, file_id):
         return audio  # Return original if enhancement fails
 
 def process_audio_super_fast(input_path, output_path, intensity_level, file_id):
-    """Super fast audio processing using only pydub"""
+    """AI-powered audio processing using ClearerVoice"""
     try:
-        update_progress(file_id, 'initializing', 10, 'Initializing super-fast processing...')
+        update_progress(file_id, 'initializing', 10, 'Initializing AI-powered processing...')
         
-        # Try to import pydub with fallback
+        # Try to import ClearerVoice for AI processing
         try:
-            from pydub import AudioSegment
-            logger.info("Successfully imported pydub")
-            use_pydub = True
+            from clearvoice import ClearVoice
+            logger.info("Successfully imported ClearerVoice")
+            use_clearvoice = True
         except ImportError as e:
-            logger.error(f"Failed to import pydub: {e}")
-            use_pydub = False
+            logger.error(f"Failed to import ClearerVoice: {e}")
+            use_clearvoice = False
         
-        if not use_pydub:
-            # Fallback: Use basic file operations
-            logger.info("Using fallback audio processing method")
-            return process_audio_fallback(input_path, output_path, intensity_level, file_id)
+        if not use_clearvoice:
+            # Fallback: Use pydub with basic enhancement
+            logger.info("Using pydub fallback processing")
+            return process_audio_pydub_fallback(input_path, output_path, intensity_level, file_id)
         
         update_progress(file_id, 'loading', 20, 'Loading audio file...')
         
@@ -174,15 +174,97 @@ def process_audio_super_fast(input_path, output_path, intensity_level, file_id):
         if os.path.exists(input_path):
             logger.info(f"Input file size: {os.path.getsize(input_path)} bytes")
         
-        try:
-            audio = AudioSegment.from_file(input_path)
-            logger.info(f"Audio loaded successfully, duration: {len(audio)}ms")
-        except Exception as e:
-            logger.error(f"Failed to load audio with pydub: {e}")
-            logger.info("Falling back to basic processing")
-            return process_audio_fallback(input_path, output_path, intensity_level, file_id)
+        update_progress(file_id, 'model_loading', 30, 'Loading AI model for speech enhancement...')
         
-        update_progress(file_id, 'processing', 25, 'Getting processing configuration...')
+        # Initialize ClearerVoice with appropriate model based on intensity
+        model_config = get_clearvoice_model_config(intensity_level)
+        logger.info(f"Using ClearerVoice model: {model_config}")
+        
+        try:
+            # Initialize the AI model
+            cv = ClearVoice(task='speech_enhancement', model_names=[model_config['model_name']])
+            logger.info(f"AI model loaded successfully: {model_config['model_name']}")
+        except Exception as e:
+            logger.error(f"Failed to load AI model: {e}")
+            logger.info("Falling back to pydub processing")
+            return process_audio_pydub_fallback(input_path, output_path, intensity_level, file_id)
+        
+        update_progress(file_id, 'processing', 50, 'Processing audio with AI model...')
+        
+        # Process the audio using AI
+        try:
+            cv(input_path, output_path)
+            logger.info(f"AI processing completed successfully")
+        except Exception as e:
+            logger.error(f"AI processing failed: {e}")
+            logger.info("Falling back to pydub processing")
+            return process_audio_pydub_fallback(input_path, output_path, intensity_level, file_id)
+        
+        update_progress(file_id, 'saving', 90, 'Saving AI-enhanced audio...')
+        
+        # Verify output
+        logger.info(f"Checking if output file exists: {output_path}")
+        logger.info(f"File exists: {os.path.exists(output_path)}")
+        
+        if os.path.exists(output_path):
+            file_size = os.path.getsize(output_path)
+            logger.info(f"Output file size: {file_size} bytes")
+            update_progress(file_id, 'complete', 100, f'AI processing complete! Output: {file_size} bytes')
+            logger.info(f"AI processing completed! Output size: {file_size} bytes")
+            return True
+        else:
+            logger.error(f"Output file was not created: {output_path}")
+            update_progress(file_id, 'error', 0, 'Output file not generated')
+            return False
+            
+    except Exception as e:
+        error_msg = f"AI processing error: {e}"
+        update_progress(file_id, 'error', 0, error_msg)
+        logger.error(error_msg)
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        return False
+
+def get_clearvoice_model_config(intensity_level):
+    """Get ClearerVoice model configuration based on intensity level"""
+    model_configs = {
+        "light": {
+            "model_name": "FRCRN_SE_16K",
+            "description": "Light AI enhancement (5-10 seconds)",
+            "processing_time": "5-10 seconds"
+        },
+        "medium": {
+            "model_name": "FRCRN_SE_16K",
+            "description": "Balanced AI enhancement (5-10 seconds)",
+            "processing_time": "5-10 seconds"
+        },
+        "strong": {
+            "model_name": "MossFormer2_SE_48K",
+            "description": "Maximum AI enhancement (10-15 seconds)",
+            "processing_time": "10-15 seconds"
+        }
+    }
+    return model_configs.get(intensity_level, model_configs["light"])
+
+def process_audio_pydub_fallback(input_path, output_path, intensity_level, file_id):
+    """Fallback audio processing using pydub when AI is not available"""
+    try:
+        update_progress(file_id, 'processing', 60, 'Using pydub enhancement...')
+        
+        # Import pydub
+        try:
+            from pydub import AudioSegment
+            logger.info("Successfully imported pydub")
+        except ImportError as e:
+            logger.error(f"Failed to import pydub: {e}")
+            update_progress(file_id, 'error', 0, 'Audio processing library not available')
+            return False
+        
+        # Load audio file
+        audio = AudioSegment.from_file(input_path)
+        logger.info(f"Audio loaded successfully, duration: {len(audio)}ms")
+        
+        update_progress(file_id, 'processing', 70, 'Applying audio enhancement...')
         
         # Get processing configuration
         config = get_processing_config(intensity_level)
@@ -201,14 +283,10 @@ def process_audio_super_fast(input_path, output_path, intensity_level, file_id):
         )
         
         # Verify output
-        logger.info(f"Checking if output file exists: {output_path}")
-        logger.info(f"File exists: {os.path.exists(output_path)}")
-        
         if os.path.exists(output_path):
             file_size = os.path.getsize(output_path)
-            logger.info(f"Output file size: {file_size} bytes")
-            update_progress(file_id, 'complete', 100, f'Super-fast processing complete! Output: {file_size} bytes')
-            logger.info(f"Super-fast processing completed! Output size: {file_size} bytes")
+            logger.info(f"Pydub processing completed! Output size: {file_size} bytes")
+            update_progress(file_id, 'complete', 100, f'Pydub enhancement complete! Output: {file_size} bytes')
             return True
         else:
             logger.error(f"Output file was not created: {output_path}")
@@ -216,40 +294,7 @@ def process_audio_super_fast(input_path, output_path, intensity_level, file_id):
             return False
             
     except Exception as e:
-        error_msg = f"Super-fast processing error: {e}"
-        update_progress(file_id, 'error', 0, error_msg)
-        logger.error(error_msg)
-        import traceback
-        logger.error(f"Full traceback: {traceback.format_exc()}")
-        return False
-
-def process_audio_fallback(input_path, output_path, intensity_level, file_id):
-    """Fallback audio processing when pydub is not available"""
-    try:
-        update_progress(file_id, 'processing', 30, 'Using fallback audio processing...')
-        
-        # Get processing configuration
-        config = get_processing_config(intensity_level)
-        
-        # Simple fallback: copy the file and modify the filename to indicate processing
-        import shutil
-        
-        # Copy the original file to the processed location
-        shutil.copy2(input_path, output_path)
-        
-        # Verify the file was copied
-        if os.path.exists(output_path):
-            file_size = os.path.getsize(output_path)
-            logger.info(f"Fallback processing completed! Output size: {file_size} bytes")
-            update_progress(file_id, 'complete', 100, f'Fallback processing complete! Output: {file_size} bytes')
-            return True
-        else:
-            logger.error(f"Fallback processing failed: output file not created")
-            update_progress(file_id, 'error', 0, 'Fallback processing failed')
-            return False
-            
-    except Exception as e:
-        error_msg = f"Fallback processing error: {e}"
+        error_msg = f"Pydub fallback error: {e}"
         update_progress(file_id, 'error', 0, error_msg)
         logger.error(error_msg)
         return False
@@ -274,16 +319,25 @@ def serve_static(filename):
 def health_check():
     """Health check endpoint"""
     try:
+        # Check if ClearerVoice is available
+        try:
+            from clearvoice import ClearVoice
+            clearvoice_available = True
+            logger.info("ClearerVoice is available in health check")
+            processing_method = "AI-powered ClearerVoice processing (5-15 seconds)"
+        except ImportError as e:
+            clearvoice_available = False
+            logger.error(f"ClearerVoice import error in health check: {e}")
+            processing_method = "Fallback pydub processing"
+        
         # Check if pydub is available
         try:
             from pydub import AudioSegment
             pydub_available = True
             logger.info("Pydub is available in health check")
-            processing_method = "Super-fast pydub processing (2-5 seconds)"
         except ImportError as e:
             pydub_available = False
             logger.error(f"Pydub import error in health check: {e}")
-            processing_method = "Fallback processing (file copy)"
         
         # Check if directories exist
         upload_exists = Config.UPLOAD_FOLDER.exists()
@@ -292,11 +346,12 @@ def health_check():
         return jsonify({
             "status": "healthy", 
             "message": "Voice Enhancer AI is running",
+            "clearvoice_available": clearvoice_available,
             "pydub_available": pydub_available,
             "upload_folder_exists": upload_exists,
             "processed_folder_exists": processed_exists,
             "processing_method": processing_method,
-            "version": "2.0 - Lightning Fast"
+            "version": "3.0 - AI-Powered"
         })
     except Exception as e:
         logger.error(f"Health check error: {e}")
@@ -373,10 +428,10 @@ def process_audio():
         
         # Get processing configuration
         intensity_level = get_intensity_level(intensity)
-        config = get_processing_config(intensity_level)
+        ai_config = get_clearvoice_model_config(intensity_level)
         
         logger.info(f"Processing with intensity: {intensity} ({intensity_level})")
-        logger.info(f"Processing config: {config}")
+        logger.info(f"AI model config: {ai_config}")
         
         # Process audio in background thread
         def process_in_background():
@@ -427,10 +482,10 @@ def process_audio():
         return jsonify({
             "success": True,
             "file_id": file_id,
-            "message": "Super-fast processing started! Use /api/progress/{file_id} to track progress.",
+            "message": "AI-powered processing started! Use /api/progress/{file_id} to track progress.",
             "status": "processing",
-            "estimated_time": config['processing_time'],
-            "processing_method": "Lightning-fast pydub enhancement"
+            "estimated_time": ai_config['processing_time'],
+            "processing_method": "AI-powered ClearerVoice enhancement"
         })
         
     except Exception as e:
