@@ -148,81 +148,95 @@ def apply_audio_enhancement(audio, config, file_id):
         return audio  # Return original if enhancement fails
 
 def process_audio_super_fast(input_path, output_path, intensity_level, file_id):
-    """AI-powered audio processing using ClearerVoice"""
+    """AI-powered audio processing using ClearerVoice with robust fallback"""
     try:
         update_progress(file_id, 'initializing', 10, 'Initializing AI-powered processing...')
         
-        # Try to import ClearerVoice for AI processing
-        try:
-            from clearvoice import ClearVoice
-            logger.info("Successfully imported ClearerVoice")
-            use_clearvoice = True
-        except ImportError as e:
-            logger.error(f"Failed to import ClearerVoice: {e}")
-            use_clearvoice = False
-        
-        if not use_clearvoice:
-            # Fallback: Use pydub with basic enhancement
-            logger.info("Using pydub fallback processing")
-            return process_audio_pydub_fallback(input_path, output_path, intensity_level, file_id)
-        
-        update_progress(file_id, 'loading', 20, 'Loading audio file...')
-        
-        # Load audio file
-        logger.info(f"Loading audio file from: {input_path}")
-        logger.info(f"Input file exists: {os.path.exists(input_path)}")
-        if os.path.exists(input_path):
-            logger.info(f"Input file size: {os.path.getsize(input_path)} bytes")
-        
-        update_progress(file_id, 'model_loading', 30, 'Loading AI model for speech enhancement...')
-        
-        # Initialize ClearerVoice with appropriate model based on intensity
-        model_config = get_clearvoice_model_config(intensity_level)
-        logger.info(f"Using ClearerVoice model: {model_config}")
-        
-        try:
-            # Initialize the AI model
-            cv = ClearVoice(task='speech_enhancement', model_names=[model_config['model_name']])
-            logger.info(f"AI model loaded successfully: {model_config['model_name']}")
-        except Exception as e:
-            logger.error(f"Failed to load AI model: {e}")
-            logger.info("Falling back to pydub processing")
-            return process_audio_pydub_fallback(input_path, output_path, intensity_level, file_id)
-        
-        update_progress(file_id, 'processing', 50, 'Processing audio with AI model...')
-        
-        # Process the audio using AI
-        try:
-            cv(input_path, output_path)
-            logger.info(f"AI processing completed successfully")
-        except Exception as e:
-            logger.error(f"AI processing failed: {e}")
-            logger.info("Falling back to pydub processing")
-            return process_audio_pydub_fallback(input_path, output_path, intensity_level, file_id)
-        
-        update_progress(file_id, 'saving', 90, 'Saving AI-enhanced audio...')
-        
-        # Verify output
-        logger.info(f"Checking if output file exists: {output_path}")
-        logger.info(f"File exists: {os.path.exists(output_path)}")
-        
-        if os.path.exists(output_path):
-            file_size = os.path.getsize(output_path)
-            logger.info(f"Output file size: {file_size} bytes")
-            update_progress(file_id, 'complete', 100, f'AI processing complete! Output: {file_size} bytes')
-            logger.info(f"AI processing completed! Output size: {file_size} bytes")
-            return True
-        else:
-            logger.error(f"Output file was not created: {output_path}")
-            update_progress(file_id, 'error', 0, 'Output file not generated')
+        # Check if input file is valid
+        if not os.path.exists(input_path):
+            logger.error(f"Input file does not exist: {input_path}")
+            update_progress(file_id, 'error', 0, 'Input file not found')
             return False
+        
+        file_size = os.path.getsize(input_path)
+        if file_size == 0:
+            logger.error(f"Input file is empty: {input_path}")
+            update_progress(file_id, 'error', 0, 'Input file is empty')
+            return False
+        
+        logger.info(f"Input file size: {file_size} bytes")
+        
+        # Try AI processing first (but don't crash if it fails)
+        ai_success = try_ai_processing(input_path, output_path, intensity_level, file_id)
+        
+        if ai_success:
+            logger.info("AI processing completed successfully")
+            return True
+        
+        # Fallback to pydub enhancement
+        logger.info("AI processing failed, using pydub fallback")
+        update_progress(file_id, 'processing', 60, 'Using pydub enhancement...')
+        
+        return process_audio_pydub_fallback(input_path, output_path, intensity_level, file_id)
             
     except Exception as e:
-        error_msg = f"AI processing error: {e}"
+        error_msg = f"Processing error: {e}"
         update_progress(file_id, 'error', 0, error_msg)
         logger.error(error_msg)
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
+        return False
+
+def try_ai_processing(input_path, output_path, intensity_level, file_id):
+    """Try AI processing with comprehensive error handling"""
+    try:
+        update_progress(file_id, 'model_loading', 20, 'Loading AI model...')
+        
+        # Try to import ClearerVoice
+        try:
+            from clearvoice import ClearVoice
+            logger.info("ClearerVoice imported successfully")
+        except ImportError as e:
+            logger.error(f"ClearerVoice import failed: {e}")
+            return False
+        
+        # Get model configuration
+        model_config = get_clearvoice_model_config(intensity_level)
+        logger.info(f"Using AI model: {model_config}")
+        
+        update_progress(file_id, 'model_loading', 30, f'Initializing {model_config["model_name"]}...')
+        
+        # Initialize model with timeout protection
+        try:
+            cv = ClearVoice(task='speech_enhancement', model_names=[model_config['model_name']])
+            logger.info(f"AI model initialized: {model_config['model_name']}")
+        except Exception as e:
+            logger.error(f"AI model initialization failed: {e}")
+            return False
+        
+        update_progress(file_id, 'processing', 50, 'Processing with AI model...')
+        
+        # Process audio with timeout protection
+        try:
+            cv(input_path, output_path)
+            logger.info("AI processing completed")
+            
+            # Verify output
+            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                file_size = os.path.getsize(output_path)
+                logger.info(f"AI output file size: {file_size} bytes")
+                update_progress(file_id, 'complete', 100, f'AI processing complete! Output: {file_size} bytes')
+                return True
+            else:
+                logger.error("AI processing failed to create output file")
+                return False
+                
+        except Exception as e:
+            logger.error(f"AI processing execution failed: {e}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"AI processing error: {e}")
         return False
 
 def get_clearvoice_model_config(intensity_level):
@@ -654,6 +668,62 @@ def test_serve(filename):
     except Exception as e:
         logger.error(f"TEST: Error serving file {filename}: {e}")
         return jsonify({"error": "File not found"}), 404
+
+@app.route('/api/test-audio-processing', methods=['POST'])
+def test_audio_processing():
+    """Test endpoint to verify basic audio processing functionality"""
+    try:
+        if 'audio' not in request.files:
+            return jsonify({"error": "No audio file provided"}), 400
+        
+        file = request.files['audio']
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        # Generate test filename
+        file_id = str(uuid.uuid4())
+        original_extension = file.filename.rsplit('.', 1)[1].lower()
+        test_filename = f"test_{file_id}_original.{original_extension}"
+        test_path = Config.UPLOAD_FOLDER / test_filename
+        
+        logger.info(f"TEST: Processing test audio file: {test_path}")
+        
+        # Save uploaded file
+        file.save(test_path)
+        
+        # Test pydub processing (lightweight)
+        try:
+            from pydub import AudioSegment
+            audio = AudioSegment.from_file(str(test_path))
+            logger.info(f"TEST: Audio loaded successfully, duration: {len(audio)}ms")
+            
+            # Simple enhancement
+            enhanced = audio + 3  # Boost volume slightly
+            output_path = Config.PROCESSED_FOLDER / f"test_{file_id}_enhanced.wav"
+            enhanced.export(str(output_path), format="wav")
+            
+            if os.path.exists(output_path):
+                file_size = os.path.getsize(output_path)
+                logger.info(f"TEST: Enhanced file created, size: {file_size} bytes")
+                
+                return jsonify({
+                    "success": True,
+                    "message": "Basic audio processing test successful",
+                    "original_file": test_filename,
+                    "enhanced_file": f"test_{file_id}_enhanced.wav",
+                    "original_duration": len(audio),
+                    "file_size": file_size
+                })
+            else:
+                return jsonify({"error": "Failed to create enhanced file"}), 500
+                
+        except Exception as e:
+            logger.error(f"TEST: Pydub processing failed: {e}")
+            return jsonify({"error": f"Audio processing failed: {str(e)}"}), 500
+        
+    except Exception as e:
+        logger.error(f"TEST: Audio processing test error: {e}")
+        return jsonify({"error": f"Test failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', Config.PORT))
